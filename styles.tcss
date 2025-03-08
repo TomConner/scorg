@@ -1,0 +1,7 @@
+#scans-inbox #scan-dest-1 #scan-dest-2 {
+    dock: left;
+}
+
+#scan-dest {
+    dock: right;
+}
