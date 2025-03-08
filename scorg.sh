@@ -21,9 +21,14 @@ source_file_ideas() {
   find "$SCAN_DIR" -maxdepth 1 -type f -not -path "*/\.*" | head -10
 }
 
-# fzf UI to seelect source file
+# path of one source file
+one_source_file() {
+  source_file_ideas | head -1
+}
+
+# fzf UI to select source file
 select_source_file() {
-  source_file_ideas | head -1 #fzf -i --height ~75%
+  source_file_ideas | fzf -i --height ~75%
 }
 
 # list of destination directories - recursive list of
@@ -89,7 +94,7 @@ main() {
     #
     # Select source file, quit if no selection
     #
-    SRC_FILE=$(select_source_file)
+    SRC_FILE=$(one_source_file)
     [ -n "$SRC_FILE" ]
   do
     #
@@ -119,6 +124,7 @@ main() {
     #
     DEST_FILENAME=$(select_filename "$suffix")
     [ -n "$DEST_FILENAME" ] || break
+    DEST_FILENAME="$(basename "$DEST_FILENAME")".pdf
     printf "$format3" "$DEST_FILENAME"
 
     #
