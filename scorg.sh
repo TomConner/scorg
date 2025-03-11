@@ -28,7 +28,7 @@ one_source_file() {
 
 # fzf UI to select source file
 select_source_file() {
-  source_file_ideas | fzf -i --height ~75%
+  source_file_ideas | fzf -i --height ~40%
 }
 
 # list of destination directories - recursive list of
@@ -40,7 +40,7 @@ destination_dir_ideas() {
 
 # fzf UI to select destination directory
 select_destination_dir() {
-  destination_dir_ideas | fzf -i --height ~75%
+  destination_dir_ideas | fzf -i --height ~40%
 }
 
 # list of timestamped filenames
@@ -72,7 +72,7 @@ filename_ideas() {
 }
 
 select_filename() {
-  filename_ideas "$1" | fzf -i
+  filename_ideas "$1" | fzf -i --height ~40%
 }
 
 suffix_ideas() {
@@ -82,7 +82,7 @@ suffix_ideas() {
 }
 
 select_suffix() {
-  suffix_ideas | fzf -i
+  suffix_ideas | fzf -i --height ~40%
 }
 
 main() {
