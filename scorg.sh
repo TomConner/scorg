@@ -32,10 +32,21 @@ select_source_file() {
 }
 
 # list of destination directories - recursive list of
-# dirs under `destinations` which can include symlinks,
+# dirs under directory `d` which can include symlinks,
 # which will be followed
+print_directories() {
+  find "/mnt/c/Users/tomco/OneDrive/$1" -type d -not -path "*/\.*"
+}
 destination_dir_ideas() {
-  find -L destinations -type d -not -path "*/\.*" | sort
+  print_directories 0-Scan
+  print_directories ABC
+  print_directories Documents/Scans
+  print_directories IncomeTax
+  print_directories James
+  print_directories Money
+  print_directories "Practice Papers"
+  print_directories Songs
+  print_directories Documents
 }
 
 # fzf UI to select destination directory
@@ -43,17 +54,19 @@ select_destination_dir() {
   destination_dir_ideas | fzf -i --height ~40%
 }
 
-# list of timestamped filenames
-filename_ideas() {
-  local suffix="$1"
-  printf "%s\n" "$(basename "$SRC_FILE")"
-
-  # Get current year and month
-  current_year=$(date +%Y)
-  current_month=$(date +%m)
-
+print_days() {
   # Calculate total months to display (4 years = 48 months)
-  total_months=18
+  local total_days=$1
+
+  for ((d = 0; d < total_days; d++)); do
+    ymd=$(date --date="$d days ago" +"%Y-%m-%d")
+    printf "%s-%s\n" "$ymd" "$suffix"
+  done
+}
+
+print_months() {
+  # Calculate total months to display (4 years = 48 months)
+  local total_months=$1
 
   for ((i = 0; i < total_months; i++)); do
     # Calculate the year and month
@@ -69,6 +82,20 @@ filename_ideas() {
 
     printf "%04d-%02d-%s\n" $year $month "$suffix"
   done
+}
+
+# list of timestamped filenames
+filename_ideas() {
+  local suffix="$1"
+  printf "%s\n" "$(basename "$SRC_FILE")"
+
+  # Get current year and month
+  current_year=$(date +%Y)
+  current_month=$(date +%m)
+  current_day=$(date +%d)
+
+  print_days 60
+  print_months 18
 }
 
 select_filename() {
