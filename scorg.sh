@@ -46,6 +46,7 @@ select_destination_dir() {
 # list of timestamped filenames
 filename_ideas() {
   local suffix="$1"
+  printf "%s\n" "$(basename "$SRC_FILE")"
 
   # Get current year and month
   current_year=$(date +%Y)
@@ -68,7 +69,6 @@ filename_ideas() {
 
     printf "%04d-%02d-%s\n" $year $month "$suffix"
   done
-  printf "%s\n" "$(basename "$SRC_FILE")"
 }
 
 select_filename() {
@@ -98,25 +98,57 @@ main() {
     [ -n "$SRC_FILE" ]
   do
     #
-    # Open source file in browser, print filename in console
+    # Print filename in console
     printf "$format1" "$(basename "$SRC_FILE")"
-    wslview "$SRC_FILE"
+    read -n 1 -p 'File / View / Delete / Skip / Quit? [Fvdsq] ' action
+    printf "\n"
+    if [ "$action" = "d" ]; then
+      rm -v "$SRC_FILE"
+      continue
+    elif [ "$action" = "v" ]; then
+      wslview "$SRC_FILE"
+      continue
+    elif [ "$action" = "q" ]; then
+      break
+    elif [ "$action" = "s" ]; then
+      continue
+    fi
 
     #
     # Select destination directory, quit if no selection else
     # print selection in console
     #
     DEST_DIR=$(select_destination_dir)
-    [ -z "$DEST_DIR" ] && break
+    if [ -z "$DEST_DIR" ]; then
+      read -n 1 -p 'Delete / Skip / Quit? [dsq] ' action
+      printf "\n"
+      if [ "$action" = "d" ]; then
+        rm -v $SRC_FILE
+        continue
+      elif [ "$action" = "q" ]; then
+        break
+      elif [ "$action" = "s" ]; then
+        continue
+      fi
+    fi
     printf "$format2" "$DEST_DIR"
-    ls "$DEST_DIR"
 
     #
     # Select suffix, prompt for suffix if no selection
     #
-    suffix=$(select_suffix)
-    [ -n "$suffix" ] || read -e -p 'Suffix: ' suffix
-    #[ -n "$suffix" ] || read -e -i "$(basename "$SRC_FILE")" -p 'Suffix: ' suffix
+    read -n 1 -p 'select suFfix / Delete / Skip / Quit? [fdsq] ' action
+    printf "\n"
+    if [ "$action" = "f" ]; then
+      suffix=$(select_suffix)
+      [ -n "$suffix" ] || read -e -p 'Suffix: ' suffix
+    elif [ "$action" = "d" ]; then
+      rm -v $SRC_FILE
+      continue
+    elif [ "$action" = "s" ]; then
+      continue
+    elif [ "$action" = "q" ]; then
+      break
+    fi
 
     #
     # Select filename, quit if no selection else print selection
@@ -130,7 +162,7 @@ main() {
     #
     # Move file
     #
-    mv -v "$SRC_FILE" "$DEST_DIR"/"$DEST_FILENAME"
+    mv -iv "$SRC_FILE" "$DEST_DIR"/"$DEST_FILENAME"
     printf "\n"
   done
 }
