@@ -161,7 +161,7 @@ main() {
     elif [ "$action" = "a" ]; then
       action=s
       printf "Acquiring scan..."
-      naps2.console C300DpxAuto -a
+      naps2.console -p C300DpxAuto -a
       printf "done\n"
     fi
     [ "$action" = "q" ] && break
