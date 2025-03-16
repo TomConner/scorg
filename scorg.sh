@@ -47,11 +47,12 @@ destination_dir_ideas() {
   print_directories "Practice Papers"
   print_directories Songs
   print_directories Documents
+  print_directories
 }
 
 # fzf UI to select destination directory
 select_destination_dir() {
-  destination_dir_ideas | fzf -i --height ~40%
+  fzf -i --height ~40% <"$dirlist"
 }
 
 print_days() {
@@ -112,86 +113,89 @@ select_suffix() {
   suffix_ideas | fzf -i --height ~40%
 }
 
-main() {
-  format1="Source File:           %s\n"
-  format2="Destination Directory: %s\n"
-  format3="Destination Filename:  %s\n"
+prompt_action() {
+  read -n 1 -p "$1" action
+  printf "\n"
+}
 
-  while
-    #
-    # Select source file, quit if no selection
-    #
+main() {
+  dirlist=~/.local/state/scorg-directories.txt
+  format_sf="Source File:           %s\n"
+  format_dd="Destination Directory: %s\n"
+  format_df="Destination Filename:  %s\n"
+
+  while true; do
+
+    # What is the source file?
     SRC_FILE=$(one_source_file)
-    [ -n "$SRC_FILE" ]
-  do
-    #
-    # Print filename in console
-    printf "$format1" "$(basename "$SRC_FILE")"
-    read -n 1 -p 'File / View / Delete / Skip / Quit? [Fvdsq] ' action
-    printf "\n"
+    if [ -n "$SRC_FILE" ]; then
+      printf "$format_sf" "$(basename "$SRC_FILE")"
+    else
+      printf "$format_sf" "[None]"
+    fi
+
+    # Act on source file.
+    prompt_action 'Acquire scan / File / View / Delete / Mkdir / Cache dirlist / Skip / Quit? [Fvdmcsq] '
     if [ "$action" = "d" ]; then
       rm -v "$SRC_FILE"
       continue
     elif [ "$action" = "v" ]; then
       wslview "$SRC_FILE"
       continue
-    elif [ "$action" = "q" ]; then
+    elif [ "$action" = "m" ]; then
       break
-    elif [ "$action" = "s" ]; then
+    elif [[ "$action" == "c" || ! -e "$dirlist" ]]; then
+      printf "Listing directories..."
+      destination_dir_ideas >"$dirlist"
+      printf "done\n"
+    elif [ "$action" = "a" ]; then
+      printf "Acquiring scan..."
+      naps2.console C300DpxAuto -a
+      printf "done\n"
       continue
     fi
+    [ "$action" = "q" ] && break
+    [ "$action" = "s" ] && continue
 
-    #
-    # Select destination directory, quit if no selection else
-    # print selection in console
-    #
+    # What is the destination directory?
     DEST_DIR=$(select_destination_dir)
     if [ -z "$DEST_DIR" ]; then
-      read -n 1 -p 'Delete / Skip / Quit? [dsq] ' action
-      printf "\n"
+      prompt_action 'Delete / Skip / Quit? [dsq] '
       if [ "$action" = "d" ]; then
         rm -v $SRC_FILE
         continue
-      elif [ "$action" = "q" ]; then
-        break
-      elif [ "$action" = "s" ]; then
-        continue
       fi
+      [ "$action" = "q" ] && break
+      [ "$action" = "s" ] && continue
     fi
-    printf "$format2" "$DEST_DIR"
+    printf "$format_dd" "$DEST_DIR"
 
-    #
-    # Select suffix, prompt for suffix if no selection
-    #
-    read -n 1 -p 'select suFfix / Delete / Skip / Quit? [fdsq] ' action
-    printf "\n"
+    # What is the suffix for the destination filename?
+    prompt_action 'select suFfix / Delete / Skip / Quit? [fdsq] '
     if [ "$action" = "f" ]; then
       suffix=$(select_suffix)
       [ -n "$suffix" ] || read -e -p 'Suffix: ' suffix
+      [ -n "$suffix" ] || break
     elif [ "$action" = "d" ]; then
       rm -v $SRC_FILE
       continue
-    elif [ "$action" = "s" ]; then
-      continue
     elif [ "$action" = "q" ]; then
       break
+    elif [ "$action" = "s" ]; then
+      continue
     fi
 
-    #
-    # Select filename, quit if no selection else print selection
-    # in console
-    #
+    # What is the destination filename?
     DEST_FILENAME=$(select_filename "$suffix")
     [ -n "$DEST_FILENAME" ] || break
     DEST_FILENAME="$(basename "$DEST_FILENAME")".pdf
-    printf "$format3" "$DEST_FILENAME"
+    printf "$format_df" "$DEST_FILENAME"
 
-    #
-    # Move file
-    #
+    # Move the file.
     mv -iv "$SRC_FILE" "$DEST_DIR"/"$DEST_FILENAME"
     printf "\n"
   done
+
 }
 
 # Run the main function
