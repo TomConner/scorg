@@ -47,7 +47,6 @@ destination_dir_ideas() {
   print_directories "Practice Papers"
   print_directories Songs
   print_directories Documents
-  print_directories
 }
 
 # fzf UI to select destination directory
@@ -118,6 +117,10 @@ prompt_action() {
   printf "\n"
 }
 
+prompt_newdir() {
+  read -e -i "$1" -p "Mkdir: " newdir
+}
+
 main() {
   dirlist=~/.local/state/scorg-directories.txt
   format_sf="Source File:           %s\n"
@@ -137,27 +140,35 @@ main() {
     # Act on source file.
     prompt_action 'Acquire scan / File / View / Delete / Mkdir / Cache dirlist / Skip / Quit? [Fvdmcsq] '
     if [ "$action" = "d" ]; then
+      action=s
       rm -v "$SRC_FILE"
-      continue
     elif [ "$action" = "v" ]; then
+      action=s
       wslview "$SRC_FILE"
-      continue
     elif [ "$action" = "m" ]; then
-      break
+      action=s
+      parent_dir=$(select_destination_dir)
+      prompt_newdir "$parent_dir"
+      if [ -n "$newdir" ]; then
+        mkdir -pv "$newdir"
+        echo "$newdir" >>"$dirlist"
+      fi
     elif [[ "$action" == "c" || ! -e "$dirlist" ]]; then
+      action=s
       printf "Listing directories..."
-      destination_dir_ideas >"$dirlist"
+      destination_dir_ideas | sort | uniq >"$dirlist"
       printf "done\n"
     elif [ "$action" = "a" ]; then
+      action=s
       printf "Acquiring scan..."
       naps2.console C300DpxAuto -a
       printf "done\n"
-      continue
     fi
     [ "$action" = "q" ] && break
     [ "$action" = "s" ] && continue
 
     # What is the destination directory?
+    printf "Select destination directory\n"
     DEST_DIR=$(select_destination_dir)
     if [ -z "$DEST_DIR" ]; then
       prompt_action 'Delete / Skip / Quit? [dsq] '
