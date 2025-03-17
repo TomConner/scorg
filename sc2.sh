@@ -131,7 +131,7 @@ main() {
   while true; do
 
     # What is the source file?
-    if [ -z "$SRC_FILE" ]; then
+    if [[ -z "$SRC_FILE" || ! -e "$SRC_FILE" ]]; then
       SRC_FILE="$SCAN_DIR/$(
         cd $SCAN_DIR
         select_source_file
