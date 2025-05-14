@@ -1,7 +1,30 @@
 #!/bin/bash
 
-SCAN_DIR=/mnt/c/Users/tomco/OneDrive/Documents/Scans
-DEST_TREE=/mnt/c/Users/tomco/OneDrive
+SCRIPT_PATH=$(realpath "$0")
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+
+# Find OneDrive directory via Windows environment variable
+ONEDRIVE_WIN="$(cmd.exe /c "echo %OneDrive%" 2>/dev/null | tr -d '\r')"
+if [[ "$ONEDRIVE_WIN" != "%OneDrive%" ]] && [[ -n "$ONEDRIVE_WIN" ]]; then
+  ONEDRIVE_DIR="$(wslpath "$ONEDRIVE_WIN")"
+fi
+
+# Error if OneDrive is not found
+if [[ ! -d "$ONEDRIVE_DIR" ]]; then
+  echo "OneDrive location not found; ensure OneDrive is installed and running"
+  exit 1
+fi
+
+# Announce
+printf "OneDrive location: %s\n" "$ONEDRIVE_DIR"
+
+SCAN_DIR="$ONEDRIVE_DIR/Documents/Scans"
+if [[ ! -d "$SCAN_DIR" ]]; then
+  echo "$SCAN_DIR not found; ensure this exists and is syncing to this machine"
+  exit 1
+fi
+
+DEST_TREE="$ONEDRIVE_DIR"
 SRC_FILE=
 DEST_DIR=
 DEST_FILENAME=
@@ -33,11 +56,11 @@ select_source_file() {
 }
 
 # list of destination directories - recursive list of
-# dirs under directory `d` which can include symlinks,
-# which will be followed
+# dirs under specified directory
 print_directories() {
-  find "/mnt/c/Users/tomco/OneDrive/$1" -type d -not -path "*/\.*"
+  find "$ONEDRIVE_DIR/$1" -type d -not -path "*/\.*"
 }
+
 destination_dir_ideas() {
   print_directories 0-Scan
   print_directories ABC
@@ -132,6 +155,7 @@ main() {
 
     # What is the source file?
     if [[ -z "$SRC_FILE" || ! -e "$SRC_FILE" ]]; then
+      echo "Select incoming file..."
       SRC_FILE="$SCAN_DIR/$(
         cd $SCAN_DIR
         select_source_file
@@ -144,15 +168,19 @@ main() {
     fi
 
     # Act on source file.
-    prompt_action 'Acquire scan / File / View / Delete / Mkdir / Cache dirlist / Skip / Quit? [Fvdmcsq] '
+    prompt_action 'Acquire scan / File / View / Delete / Mkdir / show dirList / Cache dirlist / Skip / Quit :'
     if [ "$action" = "d" ]; then
       action=s
       rm -v "$SRC_FILE"
+    elif [[ "$action" == "l" ]]; then
+      action=s
+      cat "$dirlist"
     elif [ "$action" = "v" ]; then
       action=s
       wslview "$SRC_FILE"
     elif [ "$action" = "m" ]; then
       action=s
+      echo "Select parent directory"
       parent_dir=$(select_destination_dir)
       prompt_newdir "$parent_dir"
       if [ -n "$newdir" ]; then
@@ -160,14 +188,19 @@ main() {
         echo "$newdir" >>"$dirlist"
       fi
     elif [[ "$action" == "c" || ! -e "$dirlist" ]]; then
+      # Cache dirlist
       action=s
       printf "Listing directories..."
       destination_dir_ideas | sort | uniq >"$dirlist"
       printf "done\n"
     elif [ "$action" = "a" ]; then
       action=s
+      prompt_action 'Glass / Feeder / Duplex? [gfd]'
+      if [[ "$action" == "g" ]]; then
+        scanprofile=C300DpxAuto
+      fi
       printf "Acquiring scan..."
-      naps2.console -p C300DpxAuto -a
+      naps2.console -p "$scanprofile" -a
       printf "done\n"
     fi
     [ "$action" = "q" ] && break
@@ -176,7 +209,7 @@ main() {
     # What is the destination directory?
     printf "Select destination directory\n"
     DEST_DIR=$(select_destination_dir)
-    if [ -z "$DEST_DIR" ]; then
+    if [[ -z "$DEST_DIR" ]]; then
       prompt_action 'Delete / Skip / Quit? [dsq] '
       if [ "$action" = "d" ]; then
         rm -v $SRC_FILE
@@ -203,7 +236,9 @@ main() {
     fi
 
     # What is the destination filename?
+    echo "Select destination filename... (ESC to type instead of select)"
     DEST_FILENAME=$(select_filename "$suffix")
+    [ -n "$DEST_FILENAME" ] || read -e -p 'Destination filename: ' DEST_FILENAME
     [ -n "$DEST_FILENAME" ] || break
     DEST_FILENAME="$(basename "$DEST_FILENAME")".pdf
     printf "$format_df" "$DEST_FILENAME"
