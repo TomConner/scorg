@@ -36,6 +36,8 @@ def get_unique_pdf_suffixes(source_file, destination_directory) -> list[str]:
     add_from_filename(pdf_filenames, Path(source_file))
     scantree(pdf_filenames, destination_directory)
     for name in sorted(pdf_filenames):
+        while name.startswith("-"):
+            name = name[1:]
         print(name)
 
 
