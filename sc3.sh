@@ -34,15 +34,6 @@ if ! command -v fzf &>/dev/null; then
   exit 1
 fi
 
-# Announce
-printf "OneDrive location: %s\n" "$ONEDRIVE_DIR"
-printf "Inbox location: %s\n" "$SCAN_DIR"
-
-DEST_TREE="$ONEDRIVE_DIR"
-SRC_FILE=
-DEST_DIR=
-DEST_FILENAME=
-
 # list of source files, just files in SCAN_DIR
 # without a recursive search
 xsource_file_ideas() {
@@ -54,24 +45,22 @@ xone_source_file() {
   source_file_ideas | head -1
 }
 
-# fzf UI to select source file
-select_source_file() {
-  fzf -i --height ~40% -q pdf
-}
-
 # list of destination directories - recursive list of
 # dirs under specified directory
-print_directories() {
+xprint_directories() {
   find "$ONEDRIVE_DIR/$1" -type d -not -path "*/\.*"
 }
 
-# fzf UI to select destination directory
-select_destination_dir() {
-  #fzf -i --height ~40% <"$dirlist"
+# fzf UI to select directory
+select_dir() {
   (
     cd "$ONEDRIVE_DIR"
-    fzf -i
+    fzf
   )
+}
+xselect_destination_dir() {
+  #fzf -i --height ~40% <"$dirlist"
+  DEST_DIR="$(select_dir)"
 }
 
 print_days() {
@@ -136,89 +125,112 @@ prompt_action() {
   read -n 1 -p "$1" action
   printf "\n"
 }
+clear_back_line() {
+  # clear to beginning of line
+  echo -e "\033[2K\r"
 
+}
+read_1() {
+  local foo
+  read -n 1 -p "$1" one_char
+  printf "%s" "$one_char"
+}
+
+action=$(prompt_one)
+printf "\n-->%s<--" $action
+exit 0
 prompt_newdir() {
   read -e -i "$1" -p "Mkdir: " newdir
 }
 
-main() {
-  format_sf="Source File:           %s\n"
-  format_dd="Destination Directory: %s\n"
-  format_df="Destination Filename:  %s\n"
+prompt_date() {
+  read -e -i "$1" -p "Date string: " date
+  # TODO fzf it
+}
 
+HELP_TEXT="$cat <<END_HELP_TEXT"
+i select incoming file
+I acquire incoming file from scanner
+v view incoming file
+f move incoming file to destination path
+x delete incoming file
+n select names
+N create names
+y format date as year
+m format date as year and month
+d format date as year, month, and day
+D set date
+p select destination
+P create subdirectory of destination
+? show help
+q quit
+END_HELP_TEXT
+
+# Announce
+printf "OneDrive location: %s\n" "$ONEDRIVE_DIR"
+printf "Inbox location: %s\n" "$SCAN_DIR"
+
+DEST_TREE="$ONEDRIVE_DIR"
+SRC_FILE=
+DEST_DIR="$(select_dir)"
+DEST_FILENAME=
+
+destination_path() {
+  printf "%s/%s-%s" "$DEST_DIR" "$FILE_DATE" "$NAMES"
+}
+
+main() {
   while true; do
 
-    printf "Incoming: %s  Names: %s  Date: %s  Path: %s\n" \
-      "$(basename "$SRC_FILE")" "$NAMES" "$FILE_DATE" "$DEST_DIR"
+    printf "Incoming: %s\nNames: %s\nFile Date: %s\nDestination: %s\nFull destination: %s\n" \
+      "$(basename "$SRC_FILE")" "$NAMES" "$FILE_DATE" "$DEST_DIR" "$(destination_path)"
 
-    # What is the source file?
-    if [[ -z "$SRC_FILE" || ! -e "$SRC_FILE" ]]; then
-      echo "Select incoming file..."
+    prompt_action '\n[iIvfx]Incoming [nN]Names [ymdD]Date [pP]Path [?]Help [q]Quit  |>'
+    #prompt_action 'Acquire / File / View / Delete / Mkdir / show dirList / Cache dirlist / Skip / Quit :'
+    if [[ "$action" == "?" ]]; then
+      printf "%s" "$HELP_TEXT"
+    elif [[ "$action" == "i" ]]; then
+      # select incoming file
       SRC_FILE="$SCAN_DIR/$(
         cd $SCAN_DIR
-        select_source_file
+        fzf
       )"
-    fi
-    if [[ ! -n "$SRC_FILE" ]]; then
-      SRC_FILE="[None]"
-    fi
-
-    # Act on source file.
-    prompt_action '[iI]Incoming [nN]Names [ymdD]Date [p]Path [m]Mkdir [v]View [q]Quit  |>'
-    #prompt_action 'Acquire / File / View / Delete / Mkdir / show dirList / Cache dirlist / Skip / Quit :'
-    if [ "$action" = "d" ]; then
-      action=s
-      rm -v "$SRC_FILE"
-    elif [ "$action" = "v" ]; then
-      action=s
-      wslview "$SRC_FILE"
-    elif [ "$action" = "m" ]; then
-      action=s
-      echo "Select parent directory"
-      parent_dir=$(select_destination_dir)
-      prompt_newdir "$parent_dir"
-      if [ -n "$newdir" ]; then
-        mkdir -pv "$newdir"
+      if [[ ! -n "$SRC_FILE" ]]; then
+        SRC_FILE="[None]"
       fi
     elif [ "$action" = "a" ]; then
-      action=s
       prompt_action 'Glass / Feeder / Duplex? [gfd]'
+      unset scanprofile
       if [[ "$action" == "g" ]]; then
+        scanprofile=C300GlsAuto
+      elif [[ "$action" == "f" ]]; then
+        scanprofile=C300FdrAuto
+      elif [[ "$action" == "d" ]]; then
         scanprofile=C300DpxAuto
       fi
-      printf "Acquiring scan..."
-      naps2.console -p "$scanprofile" -a
-      printf "done\n"
-    fi
-    [ "$action" = "q" ] && break
-
-    # What is the destination directory?
-    printf "Select destination directory\n"
-    DEST_DIR=$(select_destination_dir)
-    if [[ -z "$DEST_DIR" ]]; then
-      prompt_action 'Delete / Skip / Quit? [dsq] '
-      if [ "$action" = "d" ]; then
-        rm -v $SRC_FILE
-        continue
-      fi
-      [ "$action" = "q" ] && break
-      [ "$action" = "s" ] && continue
-    fi
-    printf "$format_dd" "$DEST_DIR"
-
-    # What is the suffix for the destination filename?
-    prompt_action 'select suFfix / Delete / Skip / Quit? [fdsq] '
-    if [ "$action" = "f" ]; then
-      suffix=$(select_suffix)
-      [ -n "$suffix" ] || read -e -p 'Suffix: ' suffix
-      [ -n "$suffix" ] || break
+      [[ -v scanprofile ]] && naps2.console -p "$scanprofile" -a
+    elif [ "$action" = "v" ]; then
+      wslview "$SRC_FILE"
+    elif [ "$action" = "x" ]; then
+      action=s
+      rm -v "$SRC_FILE"
+    elif [ "$action" = "y" ]; then
+    elif [ "$action" = "m" ]; then
     elif [ "$action" = "d" ]; then
-      rm -v $SRC_FILE
-      continue
+    elif [ "$action" = "D" ]; then
+      FILE_DATE="$(prompt_date)"
+    elif [ "$action" = "P" ]; then
+      action=s
+      if [[ ! -d "$DEST_DIR" ]]; then
+        echo "Select parent directory"
+        parent_dir=$(select_dir)
+      fi
+      prompt_newdir "$DEST_DIR"
+      if [[ -n "$newdir" ]]; then
+        mkdir -pv "$newdir"
+      fi
     elif [ "$action" = "q" ]; then
       break
-    elif [ "$action" = "s" ]; then
-      continue
     fi
 
     # What is the destination filename?
